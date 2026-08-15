@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Live Studio Matrix</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #0f1015; color: #e1e1e1; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .matrix-card { background-color: #1a1c23; border: 1px solid #2d303b; border-radius: 10px; }
+        .matrix-header { background-color: #232630; border-bottom: 1px solid #2d303b; border-radius: 10px 10px 0 0; }
+        .form-control, .form-select { background-color: #252834; border: 1px solid #3d4255; color: #fff; }
+        .form-control:focus, .form-select:focus { background-color: #2a2d3a; border-color: #6366f1; color: #fff; box-shadow: none; }
+        .progress { height: 25px; background-color: #252834; }
+    </style>
+</head>
+<body>
+<div class="container-fluid py-4 px-4">
+    <h2 class="mb-4 fw-bold">🎙️ Advanced Live Studio</h2>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="row g-4">
+        
+        <!-- PANEL 1: Upload Matrix with Progress -->
+        <div class="col-lg-4">
+            <div class="matrix-card h-100">
+                <div class="matrix-header p-3">
+                    <h5 class="mb-0 text-info">📥 Upload Matrix</h5>
+                </div>
+                <div class="p-3">
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <input type="file" id="fileInput" name="file" class="form-control mb-3" required>
+                        <button type="submit" class="btn btn-info w-100 mb-3 fw-bold">Upload to Server</button>
+                    </form>
+                    
+                    <!-- Progress Bar -->
+                    <div class="progress mb-3 d-none" id="progressContainer">
+                        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" style="width: 0%">0%</div>
+                    </div>
+                    
+                    <hr class="border-secondary">
+                    <div class="row text-sm">
+                        <div class="col-6">
+                            <p class="text-muted mb-1">Videos:</p>
+                            <ul class="text-secondary ps-3">
+                                {% for v in videos %}<li>{{ v }}</li>{% endfor %}
+                            </ul>
+                        </div>
+                        <div class="col-6">
+                            <p class="text-muted mb-1">Thumbnails:</p>
+                            <ul class="text-secondary ps-3">
+                                {% for t in thumbnails %}<li>{{ t }}</li>{% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PANEL 2: Stream Setup & Metadata -->
+        <div class="col-lg-5">
+            <div class="matrix-card h-100">
+                <div class="matrix-header p-3">
+                    <h5 class="mb-0 text-primary">⚙️ Stream Configuration</h5>
+                </div>
+                <div class="p-3">
+                    <form action="/start_stream" method="POST">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label text-muted">Select Video</label>
+                                <select name="video_file" class="form-select" required>
+                                    <option value="">-- Choose Video --</option>
+                                    {% for v in videos %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted">Select Thumbnail (Optional)</label>
+                                <select name="thumbnail_file" class="form-select">
+                                    <option value="">-- No Thumbnail --</option>
+                                    {% for t in thumbnails %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-muted">YouTube Stream Key <span class="text-danger">*</span></label>
+                            <input type="password" name="stream_key" class="form-control" required placeholder="Paste Stream Key Here">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Stream Title</label>
+                            <input type="text" name="title" class="form-control" placeholder="24/7 Lofi Music Live">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label text-muted">Description</label>
+                            <textarea name="description" class="form-control" rows="3" placeholder="Welcome to my live stream..."></textarea>
+                        </div>
+
+                        {% if is_streaming %}
+                            <button type="button" class="btn btn-secondary w-100 py-2 fw-bold" disabled>Live Stream is Running...</button>
+                        {% else %}
+                            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">🚀 GO LIVE</button>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- PANEL 3: Stream Engine Control -->
+        <div class="col-lg-3">
+            <div class="matrix-card h-100">
+                <div class="matrix-header p-3">
+                    <h5 class="mb-0 text-danger">🔴 Live Engine</h5>
+                </div>
+                <div class="p-3 text-center">
+                    <div class="mb-4 mt-3">
+                        {% if is_streaming %}
+                            <div class="spinner-grow text-danger mb-2" role="status" style="width: 3rem; height: 3rem;"></div>
+                            <h4 class="text-danger fw-bold">ON AIR</h4>
+                            <p class="text-muted">FFmpeg is looping your video.</p>
+                        {% else %}
+                            <div class="bg-dark rounded-circle d-inline-block mb-2" style="width: 3rem; height: 3rem; border: 3px solid #333;"></div>
+                            <h4 class="text-secondary fw-bold">OFFLINE</h4>
+                            <p class="text-muted">Waiting to start...</p>
+                        {% endif %}
+                    </div>
+
+                    <form action="/stop_stream" method="POST">
+                        <button type="submit" class="btn btn-outline-danger w-100 py-2 fw-bold" {% if not is_streaming %}disabled{% endif %}>
+                            ⏹ STOP STREAM
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Upload Progress JavaScript -->
+<script>
+document.getElementById('uploadForm').addEventListener('submit', function(e) {
+    e.preventDefault(); // Stop default form submit
+    
+    let fileInput = document.getElementById('fileInput');
+    if(fileInput.files.length === 0) return;
+
+    let formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    let progressContainer = document.getElementById('progressContainer');
+    let progressBar = document.getElementById('progressBar');
+    
+    progressContainer.classList.remove('d-none'); // Show bar
+    progressBar.style.width = '0%';
+    progressBar.innerHTML = '0%';
+
+    let xhr = new XMLHttpRequest();
+    xhr.open("POST", "/upload", true);
+
+    // Track progress
+    xhr.upload.onprogress = function(e) {
+        if (e.lengthComputable) {
+            let percentComplete = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = percentComplete + '%';
+            progressBar.innerHTML = percentComplete + '%';
+        }
+    };
+
+    // When upload completes
+    xhr.onload = function() {
+        if (xhr.status == 200) {
+            progressBar.innerHTML = 'Upload Complete! Refreshing...';
+            setTimeout(() => { window.location.reload(); }, 1000); // Reload page to show new files
+        } else {
+            progressBar.classList.replace('bg-info', 'bg-danger');
+            progressBar.innerHTML = 'Upload Failed!';
+        }
+    };
+
+    xhr.send(formData);
+});
+</script>
+</body>
+</html>
+
